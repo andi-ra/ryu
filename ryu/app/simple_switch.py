@@ -16,25 +16,42 @@
 """
 An OpenFlow 1.0 L2 learning switch implementation.
 """
+import time
 
-
+import ryu.app.simple_switch
+from oslo_config import cfg
+import logging
+from ryu import log
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
+from ryu.lib import hub
 from ryu.ofproto import ofproto_v1_0
 from ryu.lib.mac import haddr_to_bin
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 
+hub.patch()
+CONF = cfg.CONF
+log.early_init_log(logging.DEBUG)
 
-class SimpleSwitch(app_manager.RyuApp):
+
+class SimpleSwitchAndi(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_0.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
-        super(SimpleSwitch, self).__init__(*args, **kwargs)
+        super(SimpleSwitchAndi, self).__init__(*args, **kwargs)
+        self.logger.debug('Random')
         self.mac_to_port = {}
+    #
+    # def start(self):
+    #     self.logger.debug('start')
+    #     hub.spawn(self._main)
+    #
+    # def _main(self):
+    #     self.logger.debug('Sono nel main')
 
     def add_flow(self, datapath, in_port, dst, src, actions):
         ofproto = datapath.ofproto
@@ -108,3 +125,21 @@ class SimpleSwitch(app_manager.RyuApp):
             self.logger.info("port modified %s", port_no)
         else:
             self.logger.info("Illeagal port state %s %s", port_no, reason)
+
+
+if __name__ == '__main__':
+    CONF(project='ryu', version='simple-switch 4', )
+    log.init_log()
+    # always enable ofp for now.
+    app_lists = ['ryu.controller.ofp_handler', 'ryu.app.simple_switch']
+
+    app_mgr = app_manager.AppManager.get_instance()
+    app_mgr.load_apps(app_lists)
+    contexts = app_mgr.create_contexts()
+    app_mgr.instantiate_apps(**contexts)
+    vrrp_router = app_mgr.instantiate(SimpleSwitchAndi, **contexts)
+    vrrp_router.start()
+
+    time.sleep(90)
+
+    app_mgr.close()

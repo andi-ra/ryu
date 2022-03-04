@@ -26,7 +26,7 @@ from ryu import ofproto
 from . import event
 
 
-NAME = 'ofp_event'
+NAME = 'bobi_event'
 
 
 class EventOFPMsgBase(event.EventBase):

@@ -12,15 +12,31 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+import sys
+import time
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+from ryu.base import app_manager
+from controller import ofp_event
+from controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from controller.handler import set_ev_cls
+from ofproto import ofproto_v1_3
+from lib.packet import packet
+from lib.packet import ethernet
+from lib.packet import ether_types
+from oslo_config import cfg
+from ryu.lib import hub
+from ryu import log
+
 
 from ryu.base import app_manager
-from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
-from ryu.controller.handler import set_ev_cls
-from ryu.ofproto import ofproto_v1_3
-from ryu.lib.packet import packet
-from ryu.lib.packet import ethernet
-from ryu.lib.packet import ether_types
+import logging
+
+hub.patch(thread=False)
+CONF = cfg.CONF
+log.early_init_log(logging.DEBUG)
+from ryu import log
 
 
 class SimpleSwitch13(app_manager.RyuApp):
@@ -65,6 +81,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
+        self.logger.debug("Modified version!!")
         # If you hit this you might want to increase
         # the "miss_send_length" of your switch
         if ev.msg.msg_len < ev.msg.total_len:
@@ -117,3 +134,21 @@ class SimpleSwitch13(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
+
+
+if __name__ == '__main__':
+    CONF(project='ryu', version='simple-switch 4', )
+    log.init_log()
+    # always enable ofp for now.
+    # app_lists = ['ryu.controller.ofp_handler']
+
+    app_mgr = app_manager.AppManager.get_instance()
+    # app_mgr.load_apps(app_lists)
+    # contexts = app_mgr.create_contexts()
+    # app_mgr.instantiate_apps(**contexts)
+    vrrp_router = app_mgr.instantiate(SimpleSwitch13)#, **contexts)
+    vrrp_router.start()
+
+    time.sleep(90)
+
+    app_mgr.close()

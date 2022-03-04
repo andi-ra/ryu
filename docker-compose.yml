@@ -1,0 +1,71 @@
+version: "3"
+services:
+  controller:
+    build: ./
+    #:/opt/project/ryu/app#
+    #    image: andi95/bobi_controller
+    #    command: tail -F anything
+    command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
+    volumes:
+      - ./:/scripts
+    cap_add:
+      - NET_ADMIN
+    networks:
+      ctrl_net:
+        ipv4_address: 172.21.156.60
+
+  controller2:
+    build: ./
+    #:/opt/project/ryu/app#
+    #    image: andi95/bobi_controller
+    command: tail -F anything
+    #      command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
+    volumes:
+      - ./:/scripts
+    cap_add:
+      - NET_ADMIN
+    networks:
+      ctrl_net:
+        ipv4_address: 172.21.156.69
+
+
+  pkt_generator:
+    #    image: pkt_generator
+    build: pkt_generator/
+    #    command: tail -F anything
+    command: python3 TCP_OFPTxx.py
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - controller
+    networks:
+      ctrl_net:
+        ipv4_address: 172.21.156.79
+
+
+#  switch:
+#    #    build: /home/ubuntu/PycharmProjects/Testi_Mininet/switch_develop/Dockerfile
+#    image: socketplane/openvswitch
+#    cap_add:
+#      - NET_ADMIN
+#    volumes:
+#      - /home/ubuntu/PycharmProjects/Testi_Mininet/switch_develop:/home/ovs
+#    command: /usr/bin/supervisord -c /home/ovs/supervisord.conf
+#    #    ovs-vsctl set-controller br0 tcp:172.21.156.6:6633
+#    networks:
+#      ctrl_net:
+#        ipv4_address: 172.21.156.2
+#      of_net:
+#        ipv4_address: 172.20.238.9
+
+
+#  watch "ovs-vsctl list controller"
+#  watch "ovs-ofctl -O OpenFlow13 dump-flows br0"
+
+networks:
+  ctrl_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.21.156.0/24"
+

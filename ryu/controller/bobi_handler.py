@@ -26,13 +26,15 @@ import ryu.base.app_manager
 
 from ryu.lib import hub
 from ryu import utils
-from ryu.controller import ofp_event
+from ryu.controller import bobi_event
 from ryu.controller.controller import OpenFlowController
 from ryu.controller.handler import set_ev_handler
-from ryu.controller.handler import HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER,\
+from ryu.controller.handler import HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, \
     MAIN_DISPATCHER
 from ryu.ofproto import ofproto_parser
-
+from ryu.lib.packet import packet
+from ryu.lib.packet import ethernet
+from ryu.lib.packet import ether_types
 
 # The state transition: HANDSHAKE -> CONFIG -> MAIN
 #
@@ -51,10 +53,9 @@ from ryu.ofproto import ofproto_parser
 class OFPHandler(ryu.base.app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(OFPHandler, self).__init__(*args, **kwargs)
-        self.name = ofp_event.NAME
+        self.name = bobi_event.NAME
         self.controller = None
-
-        self.logger.debug("MODIFIED VERSION!!")
+        self.logger.debug("BOBI BOBI!!")
 
     def start(self):
         super(OFPHandler, self).start()
@@ -70,7 +71,7 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
             data=error_desc)
         datapath.send_msg(error_msg, close_socket=True)
 
-    @set_ev_handler(ofp_event.EventOFPHello, HANDSHAKE_DISPATCHER)
+    @set_ev_handler(bobi_event.EventOFPHello, [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER])
     def hello_handler(self, ev):
         self.logger.debug('hello ev %s', ev)
         msg = ev.msg
@@ -102,14 +103,14 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
                 # negotiated version = 1.1
                 # usable version = None
                 error_desc = (
-                    'no compatible version found: '
-                    'switch versions %s controller version 0x%x, '
-                    'the negotiated version is 0x%x, '
-                    'but no usable version found. '
-                    'If possible, set the switch to use one of OF version %s'
-                    % (switch_versions, max(datapath.supported_ofp_version),
-                       max(negotiated_versions),
-                       sorted(datapath.supported_ofp_version)))
+                        'no compatible version found: '
+                        'switch versions %s controller version 0x%x, '
+                        'the negotiated version is 0x%x, '
+                        'but no usable version found. '
+                        'If possible, set the switch to use one of OF version %s'
+                        % (switch_versions, max(datapath.supported_ofp_version),
+                           max(negotiated_versions),
+                           sorted(datapath.supported_ofp_version)))
                 self._hello_failed(datapath, error_desc)
                 return
             if (negotiated_versions and usable_versions and
@@ -123,15 +124,15 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
                 # TODO: In order to get the version 1.0, Ryu need to send
                 # supported verions.
                 error_desc = (
-                    'no compatible version found: '
-                    'switch versions 0x%x controller version 0x%x, '
-                    'the negotiated version is %s but found usable %s. '
-                    'If possible, '
-                    'set the switch to use one of OF version %s' % (
-                        max(switch_versions),
-                        max(datapath.supported_ofp_version),
-                        sorted(negotiated_versions),
-                        sorted(usable_versions), sorted(usable_versions)))
+                        'no compatible version found: '
+                        'switch versions 0x%x controller version 0x%x, '
+                        'the negotiated version is %s but found usable %s. '
+                        'If possible, '
+                        'set the switch to use one of OF version %s' % (
+                            max(switch_versions),
+                            max(datapath.supported_ofp_version),
+                            sorted(negotiated_versions),
+                            sorted(usable_versions), sorted(usable_versions)))
                 self._hello_failed(datapath, error_desc)
                 return
         else:
@@ -139,8 +140,8 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
                                   in datapath.supported_ofp_version
                                   if version <= msg.version)
             if (usable_versions and
-                max(usable_versions) != min(msg.version,
-                                            datapath.ofproto.OFP_VERSION)):
+                    max(usable_versions) != min(msg.version,
+                                                datapath.ofproto.OFP_VERSION)):
                 # The version of min(msg.version, datapath.ofproto.OFP_VERSION)
                 # should be used according to the spec. But we can't.
                 # So log it and use max(usable_versions) with the hope that
@@ -169,19 +170,19 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
                 # in data, and then terminate the connection.
                 version = max(usable_versions)
                 error_desc = (
-                    'no compatible version found: '
-                    'switch 0x%x controller 0x%x, but found usable 0x%x. '
-                    'If possible, set the switch to use OF version 0x%x' % (
-                        msg.version, datapath.ofproto.OFP_VERSION,
-                        version, version))
+                        'no compatible version found: '
+                        'switch 0x%x controller 0x%x, but found usable 0x%x. '
+                        'If possible, set the switch to use OF version 0x%x' % (
+                            msg.version, datapath.ofproto.OFP_VERSION,
+                            version, version))
                 self._hello_failed(datapath, error_desc)
                 return
 
         if not usable_versions:
             error_desc = (
-                'unsupported version 0x%x. '
-                'If possible, set the switch to use one of the versions %s' % (
-                    msg.version, sorted(datapath.supported_ofp_version)))
+                    'unsupported version 0x%x. '
+                    'If possible, set the switch to use one of the versions %s' % (
+                        msg.version, sorted(datapath.supported_ofp_version)))
             self._hello_failed(datapath, error_desc)
             return
         datapath.set_version(max(usable_versions))
@@ -194,7 +195,7 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
         features_request = datapath.ofproto_parser.OFPFeaturesRequest(datapath)
         datapath.send_msg(features_request)
 
-    @set_ev_handler(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    @set_ev_handler(bobi_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         msg = ev.msg
         datapath = msg.datapath
@@ -211,7 +212,7 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
         else:
             datapath.ports = {}
 
-        if datapath.ofproto.OFP_VERSION < 0x04:
+        if datapath.ofproto.OFP_VERSION <= 0x04:
             self.logger.debug('move onto main mode')
             ev.msg.datapath.set_state(MAIN_DISPATCHER)
         else:
@@ -219,7 +220,7 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
                 datapath, 0)
             datapath.send_msg(port_desc)
 
-    @set_ev_handler(ofp_event.EventOFPPortDescStatsReply, CONFIG_DISPATCHER)
+    @set_ev_handler(bobi_event.EventOFPPortDescStatsReply, CONFIG_DISPATCHER)
     def multipart_reply_handler(self, ev):
         msg = ev.msg
         datapath = msg.datapath
@@ -233,9 +234,11 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
         self.logger.debug('move onto main mode')
         ev.msg.datapath.set_state(MAIN_DISPATCHER)
 
-    @set_ev_handler(ofp_event.EventOFPEchoRequest,
+    @set_ev_handler(bobi_event.EventOFPEchoRequest,
                     [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
     def echo_request_handler(self, ev):
+        self.logger.debug('Received REQUEST')
+        print('Received REQUEST')
         msg = ev.msg
         datapath = msg.datapath
         echo_reply = datapath.ofproto_parser.OFPEchoReply(datapath)
@@ -243,14 +246,16 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
         echo_reply.data = msg.data
         datapath.send_msg(echo_reply)
 
-    @set_ev_handler(ofp_event.EventOFPEchoReply,
+    @set_ev_handler(bobi_event.EventOFPEchoReply,
                     [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
     def echo_reply_handler(self, ev):
+        self.logger.debug('Received ECHO REPLY')
+        print('Received ECHO REPLY')
         msg = ev.msg
         datapath = msg.datapath
         datapath.acknowledge_echo_reply(msg.xid)
 
-    @set_ev_handler(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
+    @set_ev_handler(bobi_event.EventOFPPortStatus, MAIN_DISPATCHER)
     def port_status_handler(self, ev):
         msg = ev.msg
         datapath = msg.datapath
@@ -264,11 +269,11 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
             return
 
         self.send_event_to_observers(
-            ofp_event.EventOFPPortStateChange(
+            bobi_event.EventOFPPortStateChange(
                 datapath, msg.reason, msg.desc.port_no),
             datapath.state)
 
-    @set_ev_handler(ofp_event.EventOFPErrorMsg,
+    @set_ev_handler(bobi_event.EventOFPErrorMsg,
                     [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
     def error_msg_handler(self, ev):
         msg = ev.msg
@@ -311,3 +316,49 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
                 "The OpenFlow Spec says that the data field should contain "
                 "at least 64 bytes of the failed request.\n"
                 "Please check the settings or implementation of your switch.")
+    #
+    # @set_ev_handler(bobi_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    # def _packet_in_handler(self, ev):
+    #     self.logger.debug("Modified version!!")
+    #     # If you hit this you might want to increase
+    #     # the "miss_send_length" of your switch
+    #     if ev.msg.msg_len < ev.msg.total_len:
+    #         self.logger.debug("packet truncated: only %s of %s bytes",
+    #                           ev.msg.msg_len, ev.msg.total_len)
+    #     msg = ev.msg
+    #     datapath = msg.datapath
+    #     ofproto = datapath.ofproto
+    #     parser = datapath.ofproto_parser
+    #     in_port = msg.match['in_port']
+    #
+    #     pkt = packet.Packet(msg.data)
+    #     eth = pkt.get_protocols(ethernet.ethernet)[0]
+    #
+    #     if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+    #         # ignore lldp packet
+    #         return
+    #     dst = eth.dst
+    #     src = eth.src
+    #
+    #     dpid = format(datapath.id, "d").zfill(16)
+    #
+    #     self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+    #     self.logger.info("Data from packet in %s", msg.match['data'])
+    #
+    #
+    #     out_port = ofproto.OFPP_FLOOD
+    #
+    #     actions = [parser.OFPActionOutput(out_port)]
+    #
+    #     # install a flow to avoid packet_in next time
+    #     if out_port != ofproto.OFPP_FLOOD:
+    #         match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
+    #         # verify if we have a valid buffer_id, if yes avoid to send both
+    #         # flow_mod & packet_out
+    #     data = None
+    #     if msg.buffer_id == ofproto.OFP_NO_BUFFER:
+    #         data = msg.data
+    #
+    #     out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
+    #                               in_port=in_port, actions=actions, data=data)
+    #     datapath.send_msg(out)

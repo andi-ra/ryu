@@ -145,9 +145,9 @@ class OpenFlowController(object):
         self._clients = {}
 
     # entry point
-    def __call__(self):
-        # LOG.debug('call')
-        for address in CONF.ofp_switch_address_list:
+    def __call__(self, addr):
+        LOG.debug('call')
+        for address in addr:
             addr = tuple(_split_addr(address))
             self.spawn_client_loop(addr)
 
@@ -290,7 +290,7 @@ class Datapath(ofproto_protocol.ProtocolDesc):
 
         self.echo_request_interval = 1  # CONF.echo_request_interval
         # Todo: Questo max unreplied rompe le scatole...
-        self.max_unreplied_echo_requests = 15 # sys.maxsize  # CONF.maximum_unreplied_echo_requests
+        self.max_unreplied_echo_requests = 15  # CONF.maximum_unreplied_echo_requests
         self.unreplied_echo_requests = []
 
         self.xid = random.randint(0, self.ofproto.MAX_XID)
@@ -362,7 +362,7 @@ class Datapath(ofproto_protocol.ProtocolDesc):
 
                 msg = ofproto_parser.msg(
                     self, version, msg_type, msg_len, xid, buf[:msg_len])
-                # LOG.debug('queue msg %s cls %s', msg, msg.__class__)
+                LOG.debug('queue msg %s cls %s', msg, msg.__class__)
                 if msg:
                     ev = ofp_event.ofp_msg_to_ev(msg)
                     if self.ofp_brick is not None:
@@ -532,21 +532,6 @@ class Datapath(ofproto_protocol.ProtocolDesc):
     def send_barrier(self):
         barrier_request = self.ofproto_parser.OFPBarrierRequest(self)
         return self.send_msg(barrier_request)
-
-    def send_nxt_set_flow_format(self, flow_format):
-        assert (flow_format == ofproto_v1_0.NXFF_OPENFLOW10 or
-                flow_format == ofproto_v1_0.NXFF_NXM)
-        if self.flow_format == flow_format:
-            # Nothing to do
-            return
-        self.flow_format = flow_format
-        set_format = self.ofproto_parser.NXTSetFlowFormat(self, flow_format)
-        # FIXME: If NXT_SET_FLOW_FORMAT or NXFF_NXM is not supported by
-        # the switch then an error message will be received. It may be
-        # handled by setting self.flow_format to
-        # ofproto_v1_0.NXFF_OPENFLOW10 but currently isn't.
-        self.send_msg(set_format)
-        self.send_barrier()
 
     def is_reserved_port(self, port_no):
         return port_no > self.ofproto.OFPP_MAX

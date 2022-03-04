@@ -49,7 +49,7 @@ At the moment applications including the following ones are available
 
   * ryu.app.simple_isolation.SimpleIsolation
   * ryu.app.rest.RestAPI
-  * ryu.app.simple_bridge.SimpleSwitch
+  * ryu.app.simple_bridge.SimpleSwitchAndi
 
 The generic available is as follows::
 
