@@ -6,8 +6,6 @@ services:
     #    image: andi95/bobi_controller
     #    command: tail -F anything
     command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
-    volumes:
-      - ./:/scripts
     cap_add:
       - NET_ADMIN
     networks:
@@ -20,8 +18,6 @@ services:
     #    image: andi95/bobi_controller
     command: tail -F anything
     #      command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
-    volumes:
-      - ./:/scripts
     cap_add:
       - NET_ADMIN
     networks:

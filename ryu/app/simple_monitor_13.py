@@ -1,4 +1,4 @@
-# Copyright (C) 2016 Nippon Telegraph and Telephone Corporation.
+    # Copyright (C) 2016 Nippon Telegraph and Telephone Corporation.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,9 +27,16 @@ except ModuleNotFoundError:
     from base import app_manager
 import logging
 
-from app import simple_switch_13
 
-from controller.handler import DEAD_DISPATCHER
+try:
+    from ryu.app import simple_switch_13
+except ModuleNotFoundError:
+    from app import simple_switch_13
+
+try:
+    from ryu.controller.handler import DEAD_DISPATCHER
+except:
+    from controller.handler import DEAD_DISPATCHER
 
 try:
     from ryu.controller import bobi_event
