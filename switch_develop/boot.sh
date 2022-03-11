@@ -47,7 +47,7 @@ done
 
 #ovs-ofctl -O OpenFlow13 del-flows br0
 mkdir -p -m0755 /var/run/sshd && /usr/sbin/sshd
-/usr/share/openvswitch/scripts/ovs-ctl restart
+sudo /usr/share/openvswitch/scripts/ovs-ctl restart
 x=0
   until [ $x = "1" ]; do
     ovs-vsctl --may-exist add-br br$x
@@ -65,3 +65,5 @@ until [ $x = "1" ]; do
   x=$((x + 1))
 done
 /bin/bash
+
+

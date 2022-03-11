@@ -16,8 +16,8 @@ services:
     build: ./
     #:/opt/project/ryu/app#
     #    image: andi95/bobi_controller
-    command: tail -F anything
-    #      command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
+    #    command: tail -F anything
+    command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
     cap_add:
       - NET_ADMIN
     networks:
@@ -29,7 +29,7 @@ services:
     #    image: pkt_generator
     build: pkt_generator/
     #    command: tail -F anything
-    command: python3 TCP_OFPTxx.py
+    command: python3 TCP_OFPTxx.py 172.21.156.60
     cap_add:
       - NET_ADMIN
     depends_on:

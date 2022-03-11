@@ -28,6 +28,7 @@ from ryu.lib import hub
 from ryu import utils
 from ryu.controller import bobi_event
 from ryu.controller.controller import OpenFlowController
+from ryu.controller.controller import OpenFlowController
 from ryu.controller.handler import set_ev_handler
 from ryu.controller.handler import HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, \
     MAIN_DISPATCHER

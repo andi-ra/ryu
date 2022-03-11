@@ -103,8 +103,13 @@ def echo_loop(stream_sock, packet):
 TIMEOUT = 2
 conf.verb = 0
 if __name__ == '__main__':
-    ip = "172.21.156.60"
-    sleep(1)
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("ip", help="ip address of peer")
+    args = parser.parse_args()
+    print(args.ip)
+    ip = args.ip
     print("Starting TCP sender OpenFlow packet forging...")
     packet = IP(dst=str(ip), ttl=20) / ICMP()
     reply = sr1(packet, timeout=TIMEOUT)

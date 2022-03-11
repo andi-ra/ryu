@@ -94,6 +94,7 @@ def _split_addr(addr):
 
 class ClientOpenFlowController(object):
     def __init__(self):
+        LOG.debug('Initialization')
         super(ClientOpenFlowController, self).__init__()
         self.addr = []
         if not CONF.ofp_tcp_listen_port and not CONF.ofp_ssl_listen_port:

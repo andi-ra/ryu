@@ -15,6 +15,7 @@
 import os
 import sys
 import time
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 from ryu.base import app_manager
@@ -28,7 +29,6 @@ from lib.packet import ether_types
 from oslo_config import cfg
 from ryu.lib import hub
 from ryu import log
-
 
 from ryu.base import app_manager
 import logging
@@ -139,15 +139,11 @@ class SimpleSwitch13(app_manager.RyuApp):
 if __name__ == '__main__':
     CONF(project='ryu', version='simple-switch 4', )
     log.init_log()
-    # always enable ofp for now.
-    # app_lists = ['ryu.controller.ofp_handler']
+    app_lists = ['ryu.controller.ofp_handler']
 
     app_mgr = app_manager.AppManager.get_instance()
-    # app_mgr.load_apps(app_lists)
-    # contexts = app_mgr.create_contexts()
-    # app_mgr.instantiate_apps(**contexts)
-    vrrp_router = app_mgr.instantiate(SimpleSwitch13)#, **contexts)
-    vrrp_router.start()
+
+    app_mgr.run_apps(app_lists)
 
     time.sleep(90)
 

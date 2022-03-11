@@ -1,4 +1,4 @@
-    # Copyright (C) 2016 Nippon Telegraph and Telephone Corporation.
+# Copyright (C) 2016 Nippon Telegraph and Telephone Corporation.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ try:
 except ModuleNotFoundError:
     from base import app_manager
 import logging
-
 
 try:
     from ryu.app import simple_switch_13
@@ -230,13 +229,11 @@ class SimpleMonitor13(app_manager.RyuApp):
 if __name__ == '__main__':
     CONF(project='ryu', version='simple-switch 4', )
     log.init_log()
-    app_lists = ['ryu.controller.bobi_handler', "ryu.app.simple_switch_13"]
+    app_lists = ['ryu.controller.client_bobi_handler',
+                 "ryu.app.simple_monitor_13",
+                 "ryu.app.simple_switch_13", ]
     app_mgr = app_manager.AppManager.get_instance()
-    app_mgr.load_apps(app_lists)
-    contexts = app_mgr.create_contexts()
-    app_mgr.instantiate_apps(**contexts)
-    vrrp_router = app_mgr.instantiate(SimpleMonitor13, simple_switch_13.SimpleSwitch13, **contexts)
-    vrrp_router.start()
+    app_mgr.run_apps(app_lists)
 
     time.sleep(999)
 
