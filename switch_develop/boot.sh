@@ -14,56 +14,102 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+NO_BRIDGE=false
+NO_IFACE=true
+
+iface_list=$(netstat -i | grep -o "eth[0-9]*")
+iface_num=$(echo $iface_list | wc -w)
+echo "Number of interfaces seen: $iface_num"
+
+#exit $?
 
 if [ ! -f "/etc/openvswitch/conf.db" ]; then
+
+  echo "No db conf file founf creating one..."
+  echo "Purging old configuration"
   ovsdb-tool create /etc/openvswitch/conf.db /usr/share/openvswitch/vswitch.ovsschema
-
-  ovsdb-server --detach --remote=punix:/var/run/openvswitch/db.sock
-  ovs-vswitchd --detach
-  ovs-vsctl --no-wait init
-
-  x=0
-  until [ $x = "1" ]; do
-    ovs-vsctl --may-exist add-br br$x
-    ovs-vsctl set bridge br$x datapath_type=netdev
-    x=$((x + 1))
-  done
+  ovs-ofctl show br0 &>/tmp/tmp_file
+  result=$(</tmp/tmp_file)
+  occurrences=$(echo "$result" | grep -c "br0 is not a bridge")
+  if [ "$occurrences" -ne 0 ]; then
+    NO_BRIDGE=true
+  else
+    echo "Bridge br0 is a valid datapath"
+  fi
+  if [ $NO_BRIDGE = false ]; then
+    # Se non è partito tutto il sistema questo non funziona...
+    ovs-vsctl del-br br0 &>/tmp/tmp_file
+    result=$(</tmp/tmp_file)
+    occurrences=$(echo "$result" | grep -c "br0")
+    if [ "$occurrences" -ne 0 ]; then
+      echo "Something went wrong reinitializing the configuration"
+      #          exit 1
+    fi
+  else
+    echo "No bridge found proceeding with initialization"
+  fi
+  /usr/share/openvswitch/scripts/ovs-ctl stop
+  sudo /usr/share/openvswitch/scripts/ovs-ctl start
+  #  echo "starting remote OVSDB server"
+  #  sudo ovsdb-server --detach --remote=punix:/var/run/openvswitch/db.sock
+  #  echo "Starting daemon"
+  #  sudo ovs-vswitchd --detach
+  #  echo "Finalizing configuration"
+  #  sudo ovs-vsctl --no-wait init
+  echo "Committing configuration"
+  sudo ovs-vsctl add-br br0
+  sudo ovs-vsctl set bridge br0 datapath_type=netdev
 
   x=1
-  until [ $x = "16" ]; do
-    ovs-vsctl --may-exist add-port br0 eth$x
+  until [ $x -eq $iface_num ]; do
+    ovs-vsctl add-port br0 eth$x
     x=$((x + 1))
   done
+  echo "Finished first initialization"
 else
-  ovsdb-server --detach --remote=punix:/var/run/openvswitch/db.sock
-  ovs-vswitchd --detach
+  timeout 2 ovsdb-server --detach --remote=punix:/var/run/openvswitch/db.sock
+  case $? in
+  124)
+    echo 'Command timed out maybe is already running'
+    echo 'Restarting ovsdb-server'
+    /usr/share/openvswitch/scripts/ovs-ctl restart
+    ;;
+  2)
+    echo 'Command ovsdb-server not found... Check installation'
+    exit $?
+    ;;
+  1)
+    echo 'Uncaught error'
+    exit $?
+    ;;
+  0)
+    echo 'Server OVSDB protocol [OK]'
+    ;;
+  esac
+  timeout 2 ovs-vswitchd --detach
+  case $? in
+  124)
+    echo 'Command: ovs-vswitchd timed out deaemon already running'
+    exit $?
+    ;;
+  2)
+    echo 'Command ovs-vswitchd not found... Check installation'
+    exit $?
+    ;;
+  1)
+    echo 'Uncaught error'
+    exit $?
+    ;;
+  0)
+    echo 'Daemon [OK]'
+    ;;
+  esac
 fi
 
-x=0
-until [ $x = "1" ]; do
-  ip link set dev br$x up
-  x=$((x + 1))
-done
+ip link set dev br0 up
 
 #ovs-ofctl -O OpenFlow13 del-flows br0
 mkdir -p -m0755 /var/run/sshd && /usr/sbin/sshd
-sudo /usr/share/openvswitch/scripts/ovs-ctl restart
-x=0
-  until [ $x = "1" ]; do
-    ovs-vsctl --may-exist add-br br$x
-    ovs-vsctl set bridge br$x datapath_type=netdev
-    x=$((x + 1))
-  done
-x=1
-  until [ $x = "16" ]; do
-    ovs-vsctl --may-exist add-port br0 eth$x
-    x=$((x + 1))
-  done
-x=0
-until [ $x = "1" ]; do
-  ip link set dev br$x up
-  x=$((x + 1))
-done
+sudo /usr/share/openvswitch/scripts/ovs-ctl stop
+sudo /usr/share/openvswitch/scripts/ovs-ctl start
 /bin/bash
-
-

@@ -251,7 +251,6 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
                     [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
     def echo_reply_handler(self, ev):
         self.logger.debug('Received ECHO REPLY')
-        print('Received ECHO REPLY')
         msg = ev.msg
         datapath = msg.datapath
         datapath.acknowledge_echo_reply(msg.xid)

@@ -109,6 +109,7 @@ if __name__ == '__main__':
     parser.add_argument("ip", help="ip address of peer")
     args = parser.parse_args()
     print(args.ip)
+    sleep(1) #Facilita l'esecuzione
     ip = args.ip
     print("Starting TCP sender OpenFlow packet forging...")
     packet = IP(dst=str(ip), ttl=20) / ICMP()

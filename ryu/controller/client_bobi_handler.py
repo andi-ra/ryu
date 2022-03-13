@@ -242,7 +242,6 @@ class ClientOFPHandler(ryu.base.app_manager.RyuApp):
                     [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
     def echo_request_handler(self, ev):
         self.logger.debug('Received REQUEST')
-        print('Received REQUEST')
         msg = ev.msg
         datapath = msg.datapath
         echo_reply = datapath.ofproto_parser.OFPEchoReply(datapath)
@@ -254,7 +253,6 @@ class ClientOFPHandler(ryu.base.app_manager.RyuApp):
                     [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER, MAIN_DISPATCHER])
     def echo_reply_handler(self, ev):
         self.logger.debug('Received ECHO REPLY')
-        print('Received ECHO REPLY')
         msg = ev.msg
         datapath = msg.datapath
         datapath.acknowledge_echo_reply(msg.xid)
