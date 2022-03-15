@@ -15,7 +15,6 @@
 import os
 import sys
 import time
-from operator import attrgetter
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -42,8 +41,7 @@ try:
 except ModuleNotFoundError:
     from controller import bobi_event
 
-from lib import hub
-from controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from controller.handler import MAIN_DISPATCHER
 from controller.handler import set_ev_cls
 from lib.packet import packet
 from lib.packet import ethernet
@@ -88,7 +86,6 @@ class SimpleMonitor13(app_manager.RyuApp):
             for dp in self.datapaths.values():
                 self._request_stats(dp)
             hub.sleep(1)
-
 
     @set_ev_cls(bobi_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -151,9 +148,8 @@ class SimpleMonitor13(app_manager.RyuApp):
 if __name__ == '__main__':
     CONF(project='ryu', version='simple-switch 4', )
     log.init_log()
-    app_lists = ['ryu.controller.client_bobi_handler',
-                 "ryu.app.simple_monitor_13",
-                 "ryu.app.simple_switch_13", ]
+    app_lists = ["ryu.app.simple_monitor_13",
+                 'ryu.controller.client_bobi_handler']
     app_mgr = app_manager.AppManager.get_instance()
     app_mgr.run_apps(app_lists)
 

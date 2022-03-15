@@ -1,19 +1,3 @@
-# Copyright (C) 2011, 2012 Nippon Telegraph and Telephone Corporation.
-# Copyright (C) 2011, 2012 Isaku Yamahata <yamahata at valinux co jp>
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-# implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """
 The main component of OpenFlow client_server.
 
@@ -27,30 +11,28 @@ import csv
 import ipaddress
 import logging
 import random
-import sys
-from socket import IPPROTO_TCP
-from socket import TCP_NODELAY
-from socket import SHUT_WR
-from socket import timeout as SocketTimeout
 import ssl
+from socket import IPPROTO_TCP
+from socket import SHUT_WR
+from socket import TCP_NODELAY
+from socket import timeout as SocketTimeout
 
-from ryu import cfg
-from ryu.lib import hub
-from ryu.lib.hub import StreamServer
+from scapy.arch import read_routes
+from scapy.layers.l2 import Ether, ARP
+from scapy.sendrecv import srp
 
 import ryu.base.app_manager
-
+from ryu import cfg
+from ryu.controller import ofp_event
+from ryu.controller.handler import HANDSHAKE_DISPATCHER, DEAD_DISPATCHER
+from ryu.lib import hub
+from ryu.lib.dpid import dpid_to_str
+from ryu.lib.hub import spawn
+from ryu.ofproto import nx_match
 from ryu.ofproto import ofproto_common
 from ryu.ofproto import ofproto_parser
 from ryu.ofproto import ofproto_protocol
 from ryu.ofproto import ofproto_v1_0
-from ryu.ofproto import nx_match
-
-from ryu.controller import ofp_event
-from ryu.controller.handler import HANDSHAKE_DISPATCHER, DEAD_DISPATCHER
-
-from ryu.lib.dpid import dpid_to_str
-from ryu.lib import ip
 
 LOG = logging.getLogger('ryu.controller.bobi_controller')
 
@@ -58,38 +40,7 @@ DEFAULT_OFP_HOST = '0.0.0.0'
 DEFAULT_OFP_SW_CON_INTERVAL = 1
 LISTEN_CONNECT_PORT = 6653
 CONF = cfg.CONF
-
-
-def _split_addr(addr):
-    """
-    Splits a str of IP address and port pair into (host, port).
-
-    Example::
-
-        >>> _split_addr('127.0.0.1:6653')
-        ('127.0.0.1', 6653)
-        >>> _split_addr('[::1]:6653')
-        ('::1', 6653)
-
-    Raises ValueError if invalid format.
-
-    :param addr: A pair of IP address and port.
-    :return: IP address and port
-    """
-    e = ValueError('Invalid IP address and port pair: "%s"' % addr)
-    pair = addr.rsplit(':', 1)
-    if len(pair) != 2:
-        raise e
-
-    addr, port = pair
-    if addr.startswith('[') and addr.endswith(']'):
-        addr = addr.lstrip('[').rstrip(']')
-        if not ip.valid_ipv6(addr):
-            raise e
-    elif not ip.valid_ipv4(addr):
-        raise e
-
-    return addr, int(port, 0)
+CFG_FILE_PEERS = '/root/ryu/peers.csv'
 
 
 class ClientOpenFlowController(object):
@@ -105,7 +56,7 @@ class ClientOpenFlowController(object):
         else:
             self.ofp_tcp_listen_port = CONF.ofp_tcp_listen_port
             self.ofp_ssl_listen_port = CONF.ofp_ssl_listen_port
-        with open('peers.csv', newline='') as csvfile:
+        with open(CFG_FILE_PEERS, newline='') as csvfile:
             spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
             for row in spamreader:
                 for address in row:
@@ -115,7 +66,50 @@ class ClientOpenFlowController(object):
         # self._clients = {
         #     ('127.0.0.1', 6653): <instance of StreamClient>,
         # }
+        # self.clients è il dictionary dei client che hanno un client loop
+        # è diverso da self.addr poiché quest'ultima è solo la lista degli
+        # ip che sono raggiungibili dal mio client OpenFlow switch peer
         self._clients = {}
+        spawn(self._update_network)
+        spawn(self._monitor_network)
+        spawn(self._align_clients_addr)
+
+    def _update_network(self):
+        LOG.debug("Spawning network status checker thread")
+        while True:
+            LOG.debug("Checking network status")
+            local_ips = {line[4] for line in read_routes() if not ipaddress.IPv4Address(line[4]).is_loopback}
+            default_br_gw = [f"192.168.{num}.1" for num in range(0, 254)]
+            ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst="192.168.0.0/22"), timeout=2)
+            nw_dst = {snd[ARP].pdst for snd, rcv, in ans if
+                      snd[ARP].pdst not in local_ips and snd[ARP].pdst not in default_br_gw}
+            with open(CFG_FILE_PEERS, "w", newline='') as csvfile:
+                fieldnames = ["Dest_Addr"]
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                for addr in nw_dst:
+                    writer.writerow({"Dest_Addr": str(addr)})
+            hub.sleep(1)
+
+    def _monitor_network(self):
+        LOG.debug("Spawning network status updater thread")
+        while True:
+            with open(CFG_FILE_PEERS, newline='') as csvfile:
+                spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+                for row in spamreader:
+                    for address in row:
+                        if address not in self.addr:
+                            self.addr.append(ipaddress.IPv4Address(address))
+            hub.sleep(1)
+
+    def _align_clients_addr(self):
+        LOG.debug("Spawning aligner thread")
+        while True:
+            for address in self.addr:
+                index = (str(address), LISTEN_CONNECT_PORT)
+                if self._clients.get(index) is None:
+                    LOG.debug("New peer in cfg file found, connecting now...")
+                    self.spawn_client_loop((str(address), LISTEN_CONNECT_PORT))
+            hub.sleep(1)
 
     # entry point
     def __call__(self):

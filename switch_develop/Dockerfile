@@ -14,4 +14,6 @@ EXPOSE 22
 VOLUME ["/etc/openvswitch/", "/root/.ssh"]
 WORKDIR /root/ryu
 ADD boot.sh /bin/boot.sh
+ADD check_ready.py /root/ryu/check_ready.py
+ADD peers.csv /root/ryu/peers.csv
 CMD /bin/sh /bin/boot.sh

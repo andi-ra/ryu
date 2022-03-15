@@ -16,6 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 NO_BRIDGE=false
 NO_IFACE=true
+NO_MANAGEMENT_IFACE=$(uname -r | grep -c '5.13.0-35-generic')
 
 iface_list=$(netstat -i | grep -o "eth[0-9]*")
 iface_num=$(echo $iface_list | wc -w)
@@ -48,7 +49,7 @@ if [ ! -f "/etc/openvswitch/conf.db" ]; then
   else
     echo "No bridge found proceeding with initialization"
   fi
-  /usr/share/openvswitch/scripts/ovs-ctl stop
+  sudo /usr/share/openvswitch/scripts/ovs-ctl stop
   sudo /usr/share/openvswitch/scripts/ovs-ctl start
   #  echo "starting remote OVSDB server"
   #  sudo ovsdb-server --detach --remote=punix:/var/run/openvswitch/db.sock
@@ -59,7 +60,7 @@ if [ ! -f "/etc/openvswitch/conf.db" ]; then
   echo "Committing configuration"
   sudo ovs-vsctl add-br br0
   sudo ovs-vsctl set bridge br0 datapath_type=netdev
-
+  echo "Starting first initialization"
   x=1
   until [ $x -eq $iface_num ]; do
     ovs-vsctl add-port br0 eth$x
@@ -112,4 +113,52 @@ ip link set dev br0 up
 mkdir -p -m0755 /var/run/sshd && /usr/sbin/sshd
 sudo /usr/share/openvswitch/scripts/ovs-ctl stop
 sudo /usr/share/openvswitch/scripts/ovs-ctl start
+
+if [ $? -eq 0 ]; then
+  echo "Finalized Config"
+else
+  echo "Error setting STP be careful with ARP storms..."
+fi
+echo "Check of config success"
+result=$(ovs-ofctl show br0 | grep -o 'dpid\:\w*')
+code=$(($? & 0xf))
+case $code in
+0)
+  echo "Successfully created bridge br0 with $result"
+  ;;
+1)
+  echo "Did not create bridge br0, error: $result"
+  echo "Trying to reinitializing the configuration"
+  ovs-vsctl del-br br0
+  echo "Recreating back again bridge"
+  ovs-vsctl add-br br0
+  echo "Adding interfaces"
+  if [ $NO_MANAGEMENT_IFACE -eq 1 ]; then
+    x=0
+  else
+    x=1
+  fi
+  until [ $x -eq $iface_num ]; do
+    ovs-vsctl add-port br0 eth$x
+    x=$((x + 1))
+  done
+  echo "Checking result"
+  result=$(ovs-ofctl show br0 | grep -o 'dpid\:\w*')
+  if [ $? -ne 0 ]; then
+    exit 1
+  else
+    echo "Created bridge with $result"
+  fi
+  ;;
+2)
+  echo "Error in ovs-ofctl command, check manually"
+  ;;
+
+esac
+echo "Dumping config"
+ovs-ofctl dump-ports-desc br0
+ovs-vsctl set bridge br0 stp_enable=true
+ovs-vsctl del-controller br0
+tail /var/log/openvswitch/ovs-vswitchd.log
 /bin/bash
+#python3 /root/ryu/check_ready.py
