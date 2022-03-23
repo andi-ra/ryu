@@ -20,6 +20,7 @@ Basic OpenFlow handling including negotiation.
 
 import itertools
 import logging
+import os
 import warnings
 
 import scapy
@@ -27,7 +28,7 @@ from scapy.layers.l2 import Ether
 from scapy.packet import Packet
 
 import ryu.base.app_manager
-from ryu.controller.bobi_client import ClientOpenFlowController
+from ryu.controller.bobi_client import ClientOpenFlowPeer
 
 from ryu.lib import hub
 from ryu import utils
@@ -63,7 +64,7 @@ class ClientOFPHandler(ryu.base.app_manager.RyuApp):
 
     def start(self):
         super(ClientOFPHandler, self).start()
-        self.client_server = ClientOpenFlowController()
+        self.client_server = ClientOpenFlowPeer()
         return hub.spawn(self.client_server)
 
     def _hello_failed(self, datapath, error_desc):
@@ -269,6 +270,22 @@ class ClientOFPHandler(ryu.base.app_manager.RyuApp):
             datapath.ports.pop(msg.desc.port_no, None)
         else:
             return
+
+        self.send_event_to_observers(
+            ofp_event.EventOFPPortStateChange(
+                datapath, msg.reason, msg.desc.port_no),
+            datapath.state)
+
+    @set_ev_handler(ofp_event.EventOFPFeaturesRequest, [HANDSHAKE_DISPATCHER, CONFIG_DISPATCHER])
+    def feature_request_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofproto = datapath.ofproto
+        self.logger.debug('Received switch features request, responding now...')
+        os.popen()
+        port_desc = datapath.ofproto_parser.OFPPortDescStatsRequest(
+                datapath, 0)
+        datapath.send_msg(port_desc)
 
         self.send_event_to_observers(
             ofp_event.EventOFPPortStateChange(

@@ -57,7 +57,7 @@ try:
 except ModuleNotFoundError:
     import hub
 
-hub.patch(thread=True)
+hub.patch(thread=False)
 CONF = cfg.CONF
 log.early_init_log(logging.DEBUG)
 

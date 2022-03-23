@@ -1,5 +1,6 @@
 """Questo è il file che mi serve per testare in TCP la riuscita della connessione """
 import copy
+import ctypes
 import random
 from threading import Thread
 
@@ -88,6 +89,11 @@ class LLDP(object):
         )
 
 
+def SUN_LEN(path):
+    """For AF_UNIX the addrlen is *not* sizeof(struct sockaddr_un)"""
+    return ctypes.c_int(2 + len(path))
+
+
 def echo_loop(stream_sock, packet):
     j = 0
     first_request = copy.deepcopy(packet)
@@ -97,7 +103,26 @@ def echo_loop(stream_sock, packet):
         reply_packet = unpack(bytes(result.res[0].answer))
         print(reply_packet.header)
         header = reply_packet.header
-        j += 1
+
+
+class TLV_DPID(ctypes.Structure):
+    """
+    In base al codice del type capisci che tipo di struttura dati DPID, farò lo stesso con i tipi diversi di pacchetto
+    """
+    _fields_ = [("type", ctypes.c_uint8), ("length", ctypes.c_uint8), ("value", 16 * ctypes.c_char)]
+
+
+class sockaddr_in(ctypes.Structure):
+    _fields_ = [("dpid", 18 * ctypes.c_byte),
+                ("sin_addr", ctypes.c_byte * 4), ]  # DPID switch e ipaddr da cui proviene questo pacchetto (datapath)
+
+
+class AnnouncePacket(ctypes.Structure):
+    """
+    Attenzione, il "announcement" packet dev'essere fatto con ctypes perché devo avere il controllo della lunghezza di
+    ogni singolo campo così che posso decodificarlo al volo perché non posso saperlo a priori!
+    """
+    _fields_ = [("type", ctypes.c_uint8), ("length", ctypes.c_uint8), ("value", 255 * ctypes.c_char)]
 
 
 TIMEOUT = 2
@@ -109,7 +134,7 @@ if __name__ == '__main__':
     parser.add_argument("ip", help="ip address of peer")
     args = parser.parse_args()
     print(args.ip)
-    sleep(1) #Facilita l'esecuzione
+    sleep(1)  # Facilita l'esecuzione
     ip = args.ip
     print("Starting TCP sender OpenFlow packet forging...")
     packet = IP(dst=str(ip), ttl=20) / ICMP()
@@ -168,6 +193,9 @@ if __name__ == '__main__':
             i += 1
 
         t.join()
+        dpid = DPID("00:00:02:42:48:8a:76:9e")
+        tlv_dpid = TLV_DPID(0, len(dpid.pack()), dpid.pack().hex().encode())
+        print(":".join([tlv_dpid.value[idx:idx + 2:].decode() for idx in list(range(0, len(tlv_dpid.value), 2))]))
 
     finally:
         print('closing socket')

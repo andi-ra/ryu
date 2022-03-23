@@ -61,7 +61,7 @@ if [ ! -f "/etc/openvswitch/conf.db" ]; then
   sudo ovs-vsctl add-br br0
   sudo ovs-vsctl set bridge br0 datapath_type=netdev
   echo "Starting first initialization"
-  x=1
+  x=0
   until [ $x -eq $iface_num ]; do
     ovs-vsctl add-port br0 eth$x
     x=$((x + 1))
@@ -160,5 +160,6 @@ ovs-ofctl dump-ports-desc br0
 ovs-vsctl set bridge br0 stp_enable=true
 ovs-vsctl del-controller br0
 tail /var/log/openvswitch/ovs-vswitchd.log
-/bin/bash
+echo "Ready for operation"
+/bin/bash -c "read "
 #python3 /root/ryu/check_ready.py

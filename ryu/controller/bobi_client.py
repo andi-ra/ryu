@@ -43,10 +43,10 @@ CONF = cfg.CONF
 CFG_FILE_PEERS = '/root/ryu/peers.csv'
 
 
-class ClientOpenFlowController(object):
+class ClientOpenFlowPeer(object):
     def __init__(self):
         LOG.debug('Initialization')
-        super(ClientOpenFlowController, self).__init__()
+        super(ClientOpenFlowPeer, self).__init__()
         self.addr = []
         if not CONF.ofp_tcp_listen_port and not CONF.ofp_ssl_listen_port:
             self.ofp_tcp_listen_port = ofproto_common.OFP_TCP_PORT
@@ -80,7 +80,7 @@ class ClientOpenFlowController(object):
             LOG.debug("Checking network status")
             local_ips = {line[4] for line in read_routes() if not ipaddress.IPv4Address(line[4]).is_loopback}
             default_br_gw = [f"192.168.{num}.1" for num in range(0, 254)]
-            ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst="192.168.0.0/22"), timeout=2)
+            ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst="192.168.0.0/29"), timeout=2)
             nw_dst = {snd[ARP].pdst for snd, rcv, in ans if
                       snd[ARP].pdst not in local_ips and snd[ARP].pdst not in default_br_gw}
             with open(CFG_FILE_PEERS, "w", newline='') as csvfile:
@@ -390,7 +390,7 @@ class Datapath(ofproto_protocol.ProtocolDesc):
         # send hello message immediately
         hello = self.ofproto_parser.OFPHello(self)
         self.send_msg(hello)
-
+        socket = self.socket
         echo_thr = hub.spawn(self._echo_request_loop)
 
         try:
@@ -461,6 +461,7 @@ def datapath_connection_factory(socket, address):
     LOG.debug('connected socket:%s address:%s', socket, address)
     with contextlib.closing(Datapath(socket, address)) as datapath:
         try:
+
             datapath.serve()
         except:
             # Something went wrong.
