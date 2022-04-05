@@ -16,4 +16,5 @@ WORKDIR /root/ryu
 ADD boot.sh /bin/boot.sh
 ADD check_ready.py /root/ryu/check_ready.py
 ADD peers.csv /root/ryu/peers.csv
+ADD app_final.py /root/ryu/app_final.py
 CMD /bin/sh /bin/boot.sh

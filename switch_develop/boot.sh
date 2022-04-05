@@ -17,7 +17,6 @@
 NO_BRIDGE=false
 NO_IFACE=true
 NO_MANAGEMENT_IFACE=$(uname -r | grep -c '5.13.0-35-generic')
-
 iface_list=$(netstat -i | grep -o "eth[0-9]*")
 iface_num=$(echo $iface_list | wc -w)
 echo "Number of interfaces seen: $iface_num"
@@ -133,11 +132,13 @@ case $code in
   echo "Recreating back again bridge"
   ovs-vsctl add-br br0
   echo "Adding interfaces"
-  if [ $NO_MANAGEMENT_IFACE -eq 1 ]; then
-    x=0
-  else
-    x=1
-  fi
+  #  if [ $NO_MANAGEMENT_IFACE -eq 1 ]; then
+  #    x=0
+  #  else
+  #    x=1
+  #  fi
+  # PER ORA METTIAMO CHE NON C'È MAI LA MANAGEMENT INTERFACE
+  x=0
   until [ $x -eq $iface_num ]; do
     ovs-vsctl add-port br0 eth$x
     x=$((x + 1))
@@ -160,6 +161,17 @@ ovs-ofctl dump-ports-desc br0
 ovs-vsctl set bridge br0 stp_enable=true
 ovs-vsctl del-controller br0
 tail /var/log/openvswitch/ovs-vswitchd.log
+echo "Assigning IP address to bridge br0"
+ip_address=$(dd if=/dev/urandom bs=1 count=1 2>/dev/null | od -An -tu1 | sed -e 's/^ *//' -e 's/  */./g')
+IP_ADDR="172.19.0.$((ip_address % 256))"
+ifconfig br0 $IP_ADDR netmask 255.255.255.0
+NUM_ADDR=$(ifconfig br0 | grep -Eo '\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){3}((25[0-4]|2[0-4][0-9]|[01]?[0-9][0-9]?))' | wc -w)
+if [ $NUM_ADDR -ne 3 ]; then
+  echo "Problem setting IP address of bridge"
+else
+  address=$(ifconfig br0 | grep 'inet ')
+  echo "Address br0 is up and running with params $address"
+fi
 echo "Ready for operation"
 /bin/bash -c "read "
 #python3 /root/ryu/check_ready.py

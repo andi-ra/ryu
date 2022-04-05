@@ -62,6 +62,11 @@ class ClientOFPHandler(ryu.base.app_manager.RyuApp):
         self.client_server = None
         self.logger.debug("BOBI BOBI!!")
 
+    def close(self):
+        self.logger.debug("Shutting down application")
+        hub.kill(self)
+        raise hub.TaskExit
+
     def start(self):
         super(ClientOFPHandler, self).start()
         self.client_server = ClientOpenFlowPeer()

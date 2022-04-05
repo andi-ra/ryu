@@ -153,6 +153,4 @@ if __name__ == '__main__':
     app_mgr = app_manager.AppManager.get_instance()
     app_mgr.run_apps(app_lists)
 
-    time.sleep(999)
-
     app_mgr.close()

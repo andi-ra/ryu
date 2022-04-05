@@ -25,18 +25,15 @@ services:
   #        ipv4_address: 192.168.1.69
 
 
-  #  pkt_generator:
-  #    #    image: pkt_generator
-  #    build: pkt_generator/
-  #    #    command: tail -F anything
-  #    command: python3 TCP_OFPTxx.py 192.168.1.60
-  #    cap_add:
-  #      - NET_ADMIN
-  #    depends_on:
-  #      - controller
-  #    networks:
-  #      ctrl_net:
-  #        ipv4_address: 192.168.1.79
+  pkt_generator:
+    #    image: pkt_generator
+    build: pkt_generator/
+    command: tail -F anything
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    links:
+      - switch
 
 
   switch:
@@ -47,11 +44,6 @@ services:
       - NET_ADMIN
       - SYS_ADMIN
     command: /bin/sh /bin/boot.sh
-    networks:
-      ctrl_net:
-        ipv4_address: 192.168.1.2
-#      ctrl_net2:
-#        ipv4_address: 192.168.2.2
     tty: true
 
 
@@ -59,56 +51,48 @@ services:
     #    build: /home/ubuntu/PycharmProjects/Testi_Mininet/switch_develop/Dockerfile
     #    image: socketplane/openvswitch
     image: switch_develop
+    links:
+      - switch
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
         #    command: python3 TCP_OFPTxx.py 192.168.1.2
 #    command: tail -F anything
-    command: /bin/sh /bin/boot.sh &
-    networks:
-      ctrl_net:
-        ipv4_address: 192.168.1.3
-      ctrl_net3:
-        ipv4_address: 192.168.3.3
-    tty: true
-
-
-  switch3:
-    #    build: /home/ubuntu/PycharmProjects/Testi_Mininet/switch_develop/Dockerfile
-    #    image: socketplane/openvswitch
-    image: switch_develop
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
-    #    command: python3 TCP_OFPTxx.py 192.168.1.2
-#    command: tail -F anything
     command: /bin/sh /bin/boot.sh
-    networks:
-#      ctrl_net2:
-#        ipv4_address: 192.168.2.4
-      ctrl_net3:
-        ipv4_address: 192.168.3.4
     tty: true
+
+
+#  switch3:
+#    #    build: /home/ubuntu/PycharmProjects/Testi_Mininet/switch_develop/Dockerfile
+#    #    image: socketplane/openvswitch
+#    image: switch_develop
+#    cap_add:
+#      - NET_ADMIN
+#      - SYS_ADMIN
+#    #    command: python3 TCP_OFPTxx.py 192.168.1.2
+##    command: tail -F anything
+#    command: /bin/sh /bin/boot.sh
+#    tty: true
 
 
 #  watch "ovs-vsctl list controller"
 #  watch "ovs-ofctl -O OpenFlow13 dump-flows br0"
 
-networks:
-  ctrl_net:
-    ipam:
-      driver: default
-      config:
-        - subnet: "192.168.1.0/29"
-  ctrl_net2:
-    ipam:
-      driver: default
-      config:
-        - subnet: "192.168.2.0/29"
-  ctrl_net3:
-    ipam:
-      driver: default
-      config:
-        - subnet: "192.168.3.0/29"
+#networks:
+#  ctrl_net:
+#    ipam:
+#      driver: default
+#      config:
+#        - subnet: "192.168.1.0/24"
+##  ctrl_net2:
+##    ipam:
+##      driver: default
+##      config:
+##        - subnet: "192.168.2.0/29"
+#  ctrl_net3:
+#    ipam:
+#      driver: default
+#      config:
+#        - subnet: "192.168.1.0/24"
 
 

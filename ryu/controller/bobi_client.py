@@ -74,6 +74,11 @@ class ClientOpenFlowPeer(object):
         spawn(self._monitor_network)
         spawn(self._align_clients_addr)
 
+    def _stop(self):
+        print("Scheduling stop in 5 seconds....")
+        hub.sleep(5)
+        raise hub.TaskExit
+
     def _update_network(self):
         LOG.debug("Spawning network status checker thread")
         while True:
