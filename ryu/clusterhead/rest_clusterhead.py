@@ -20,7 +20,7 @@ from ryu.app.wsgi import Response
 from ryu.app.wsgi import route
 from ryu.app.wsgi import WSGIApplication
 from ryu.base import app_manager
-from ryu.lib import dpid as dpid_lib
+from ryu.lib import dpid as dpid_lib, hub
 import ryu.app.ofctl.api as ofctl_api
 
 
@@ -43,6 +43,13 @@ class TopologyAPI(app_manager.RyuApp):
 
         wsgi = kwargs['wsgi']
         wsgi.register(ClusterHeadController, {'clusterhead_api_app': self})
+
+    def close(self):
+        """
+        L3Rawsocket.sr1(iface=)
+        """
+        print("Exiting clusterhead service")
+        raise hub.TaskExit
 
 
 class ClusterHeadController(ControllerBase):

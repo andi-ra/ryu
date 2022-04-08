@@ -12,17 +12,15 @@ services:
   #      ctrl_net:
   #        ipv4_address: 192.168.1.60
   #
-  #  controller2:
-  #    build: ./
-  #    #:/opt/project/ryu/app#
-  #    #    image: andi95/bobi_controller
-  #    #    command: tail -F anything
-  #    command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
-  #    cap_add:
-  #      - NET_ADMIN
-  #    networks:
-  #      ctrl_net:
-  #        ipv4_address: 192.168.1.69
+  controller2:
+    build: ./
+    command: tail -F anything
+    #    command: /bin/sh -c "cd app/ && python3 simple_monitor_13.py"
+    cap_add:
+      - NET_ADMIN
+    networks:
+      ctrl_net:
+        ipv4_address: 192.168.1.69
 
 
   pkt_generator:
@@ -32,8 +30,9 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
-    links:
-      - switch
+    networks:
+      ctrl_net:
+        ipv4_address: 192.168.1.49
 
 
   switch:
@@ -45,6 +44,9 @@ services:
       - SYS_ADMIN
     command: /bin/sh /bin/boot.sh
     tty: true
+    networks:
+      ctrl_net:
+        ipv4_address: 192.168.1.79
 
 
   switch2:
@@ -56,11 +58,13 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
-        #    command: python3 TCP_OFPTxx.py 192.168.1.2
-#    command: tail -F anything
+      #    command: python3 TCP_OFPTxx.py 192.168.1.2
+    #    command: tail -F anything
     command: /bin/sh /bin/boot.sh
     tty: true
-
+    networks:
+      ctrl_net:
+        ipv4_address: 192.168.1.59
 
 #  switch3:
 #    #    build: /home/ubuntu/PycharmProjects/Testi_Mininet/switch_develop/Dockerfile
@@ -78,12 +82,12 @@ services:
 #  watch "ovs-vsctl list controller"
 #  watch "ovs-ofctl -O OpenFlow13 dump-flows br0"
 
-#networks:
-#  ctrl_net:
-#    ipam:
-#      driver: default
-#      config:
-#        - subnet: "192.168.1.0/24"
+networks:
+  ctrl_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: "192.168.1.0/24"
 ##  ctrl_net2:
 ##    ipam:
 ##      driver: default

@@ -28,7 +28,7 @@ from ryu.ofproto import ofproto_v1_2
 from ryu.ofproto import ofproto_v1_3
 from ryu.ofproto import ofproto_v1_4
 from ryu.ofproto import ofproto_v1_5
-from ryu.lib import ofctl_v1_0
+from ryu.lib import ofctl_v1_0, hub
 from ryu.lib import ofctl_v1_2
 from ryu.lib import ofctl_v1_3
 from ryu.lib import ofctl_v1_4
@@ -776,3 +776,7 @@ class RestStatsApi(app_manager.RyuApp):
 
         del self.waiters[dp.id][msg.xid]
         lock.set()
+
+    # def close(self):
+    #     print("Exiting ofctl service")
+    #     # raise hub.TaskExit
