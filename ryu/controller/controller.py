@@ -32,6 +32,12 @@ from socket import SHUT_WR
 from socket import timeout as SocketTimeout
 import ssl
 
+from scapy.arch import get_if_addr
+from scapy.interfaces import get_if_list
+from scapy.layers.inet import UDP
+from scapy.packet import Raw
+from scapy.sendrecv import sendp
+
 from ryu import cfg
 from ryu.lib import hub
 from ryu.lib.hub import StreamServer
@@ -464,9 +470,9 @@ class Datapath(ofproto_protocol.ProtocolDesc):
         except ValueError:
             pass
 
+
     def serve(self):
         send_thr = hub.spawn(self._send_loop)
-
         # send hello message immediately
         hello = self.ofproto_parser.OFPHello(self)
         self.send_msg(hello)

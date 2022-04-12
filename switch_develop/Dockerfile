@@ -2,7 +2,8 @@ FROM controller:latest
 
 RUN apt-get update
 
-RUN apt-get install -y openvswitch-switch nano tcpdump openssh-server iputils-ping net-tools \
+RUN apt-get install -y openvswitch-switch nano tcpdump  \
+    openssh-server iputils-ping net-tools python3-netifaces \
     && rm -rf /var/cache/apt-get/*
 
 RUN ssh-keygen -A \

@@ -59,8 +59,9 @@ if [ ! -f "/etc/openvswitch/conf.db" ]; then
   echo "Committing configuration"
   sudo ovs-vsctl add-br br0
   sudo ovs-vsctl set bridge br0 datapath_type=netdev
+  ovs-vsctl set bridge br0 protocols=OpenFlow10,OpenFlow11,OpenFlow12,OpenFlow13,OpenFlow14
   echo "Starting first initialization"
-  x=0
+  x=1
   until [ $x -eq $iface_num ]; do
     ovs-vsctl add-port br0 eth$x
     x=$((x + 1))
@@ -132,13 +133,13 @@ case $code in
   echo "Recreating back again bridge"
   ovs-vsctl add-br br0
   echo "Adding interfaces"
-  #  if [ $NO_MANAGEMENT_IFACE -eq 1 ]; then
-  #    x=0
-  #  else
-  #    x=1
-  #  fi
-  # PER ORA METTIAMO CHE NON C'È MAI LA MANAGEMENT INTERFACE
-  x=0
+  if [ $NO_MANAGEMENT_IFACE -eq 1 ]; then
+    x=0
+  else
+    x=1
+  fi
+  # PER ORA METTIAMO CHE C'LA MANAGEMENT INTERFACE
+  x=1
   until [ $x -eq $iface_num ]; do
     ovs-vsctl add-port br0 eth$x
     x=$((x + 1))
@@ -161,17 +162,28 @@ ovs-ofctl dump-ports-desc br0
 ovs-vsctl set bridge br0 stp_enable=true
 ovs-vsctl del-controller br0
 tail /var/log/openvswitch/ovs-vswitchd.log
-echo "Assigning IP address to bridge br0"
+#echo "Assigning IP address to bridge br0"
+#ip_address=$(dd if=/dev/urandom bs=1 count=1 2>/dev/null | od -An -tu1 | sed -e 's/^ *//' -e 's/  */./g')
+#IP_ADDR="172.19.0.$((ip_address % 256))"
+#ifconfig br0 $IP_ADDR netmask 255.255.255.0
+#NUM_ADDR=$(ifconfig br0 | grep -Eo '\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){3}((25[0-4]|2[0-4][0-9]|[01]?[0-9][0-9]?))' | wc -w)
+#if [ $NUM_ADDR -ne 3 ]; then
+#  echo "Problem setting IP address of bridge"
+#else
+#  address=$(ifconfig br0 | grep 'inet ')
+#  echo "Address br0 is up and running with params $address"
+#fi
+echo "Assigning IP address to management interface"
 ip_address=$(dd if=/dev/urandom bs=1 count=1 2>/dev/null | od -An -tu1 | sed -e 's/^ *//' -e 's/  */./g')
-IP_ADDR="172.19.0.$((ip_address % 256))"
-ifconfig br0 $IP_ADDR netmask 255.255.255.0
-NUM_ADDR=$(ifconfig br0 | grep -Eo '\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){3}((25[0-4]|2[0-4][0-9]|[01]?[0-9][0-9]?))' | wc -w)
-if [ $NUM_ADDR -ne 3 ]; then
-  echo "Problem setting IP address of bridge"
+IP_ADDR_MANAGEMENT="192.168.0.$((ip_address % 250))"
+ifconfig eth0 $IP_ADDR_MANAGEMENT netmask 255.255.255.0
+NUM_ADDR_MANAGEMENT=$(ifconfig eth0 | grep -Eo '\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){3}((25[0-4]|2[0-4][0-9]|[01]?[0-9][0-9]?))' | wc -w)
+if [ $NUM_ADDR_MANAGEMENT -ne 3 ]; then
+  echo "Problem setting IP address of ethernet device"
 else
-  address=$(ifconfig br0 | grep 'inet ')
-  echo "Address br0 is up and running with params $address"
+  address_management=$(ifconfig eth0 | grep 'inet ')
+  echo "Address eth0 is up and running with params $address_management"
 fi
 echo "Ready for operation"
-/bin/bash -c "read "
+/bin/bash
 #python3 /root/ryu/check_ready.py

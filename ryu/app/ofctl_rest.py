@@ -777,6 +777,6 @@ class RestStatsApi(app_manager.RyuApp):
         del self.waiters[dp.id][msg.xid]
         lock.set()
 
-    # def close(self):
-    #     print("Exiting ofctl service")
-    #     # raise hub.TaskExit
+    def close(self):
+        print("Exiting ofctl service")
+        raise hub.TaskExit

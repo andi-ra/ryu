@@ -56,6 +56,10 @@ class OFPHandler(ryu.base.app_manager.RyuApp):
 
         self.logger.debug("MODIFIED VERSION!!")
 
+    def close(self):
+        print("Exiting OFPHanlder service")
+        raise hub.TaskExit
+
     def start(self):
         super(OFPHandler, self).start()
         self.controller = OpenFlowController()

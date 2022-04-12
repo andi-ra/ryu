@@ -1,5 +1,7 @@
 import ipaddress
+import re
 import signal
+import subprocess
 
 import sys
 import os
@@ -7,6 +9,7 @@ import time
 from random import random
 from subprocess import Popen
 
+from scapy.arch import get_if_addr
 from scapy.interfaces import get_if_list
 from scapy.layers.inet import UDP
 from scapy.packet import Raw
@@ -22,11 +25,14 @@ from scapy.config import conf
 from ryu.app.simple_monitor_13 import *
 
 global app_mgr
-conf.verb = 2
+conf.verb = 0
 x = 0
 hub.patch(thread=False)
 state = "client"
 global ctrl_addr
+mode = "Cycle"
+if len(sys.argv) > 1:
+    mode = sys.argv[1]
 
 
 def timeout_handler(num, stack):
@@ -40,55 +46,60 @@ def long_running_function(app_manager, app_list):
     app_manager.run_apps(app_list)
 
 
-def examine_ch_packet(packet):
-    global ctrl_addr
-    payload = packet[Raw].decode()
+def clusterhead_operation(app_mgr, app_lists):
     try:
-        address = ipaddress.IPv4Address(payload)
-    except:
+        long_running_function(app_mgr, app_lists)
+    except hub.TaskExit:
+        pass
+    except Exception as e:
+        print(e)
+
+
+def client_operation():
+    print("Listening for clusterhead announce")
+    t = AsyncSniffer(filter="udp", lfilter=lambda x: x[UDP].dport == 6969, timeout=6, count=1, iface="eth0")
+    t.start()
+    print("Starting base leaf node operation")
+    t.join()
+    results = t.results
+    print(results)
+    try:
+        ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', str(bytes(results[0].payload)))
+    except IndexError:
+        print("No packet received...")
         return
-    print(address)
-    ctrl_addr = address
+    try:
+        address = ipaddress.IPv4Address(str(ip[0]))
+    except ipaddress.AddressValueError:
+        address = ipaddress.IPv4Address('192.168.0.'+str(ip[0]).split(".")[3])
+    out = subprocess.run(f"ovs-vsctl set-controller br0 tcp:{str(address)}:6653", shell=True)
+    print(out)
+    time.sleep(5)
 
 
 if __name__ == '__main__':
-    ctrl_addr = None
     print("Lancio l'applicazione principale...")
-    signal.signal(signal.SIGALRM, timeout_handler)
-    CONF(project='ryu', version='simple-switch 4', )
     log.init_log()
-    # app_lists = ["ryu.app.simple_monitor_13",
-    #              'ryu.controller.client_bobi_handler']
     app_lists = ['ryu.clusterhead.rest_clusterhead',
                  'ryu.app.ofctl.service',
+                 'ryu.app.shortest_path',
                  'ryu.controller.ofp_handler',
-                 'ryu.app.ofctl_rest']
+                 'ryu.app.ofctl_rest',]
     app_mgr = app_manager.AppManager.get_instance()
-    # app_mgr.run_apps(app_lists)
-    while x < 10:
-        if random() < 0.3:
-            print("Announcing myself as clusterhead")
-            for iface in [interface for interface in get_if_list()
-                          if "lo" not in interface
-                             and "ovs" not in interface]:
-                sendp(UDP(dport=6969) / (Raw("172.15.69.23".encode())), iface=iface)
-            signal.alarm(3)
-            try:
-                long_running_function(app_mgr, app_lists)
-            except hub.TaskExit:
-                pass
-            except Exception as e:
-                print(e)
+    while x < 100:
+        signal.signal(signal.SIGALRM, timeout_handler)
+        if "ctrl" in mode:
+            clusterhead_operation(app_mgr, app_lists)
+        elif "client" in mode:
+            client_operation()
         else:
-            print("Listening for clusterhead announce")
-            t = AsyncSniffer(filter="udp", lfilter=lambda x: x[UDP].dport == 6969, timeout=3, count=1)
-            t.start()
-            print("Starting base leaf node operation")
-            t.join()
-            results = t.results
-            print(results)
-            print(f"ovs-vsctl set-controller {ctrl_addr}")
-            # hub.sleep(3)
+            if random() < 0.3:
+                signal.alarm(10)
+                clusterhead_operation(app_mgr, app_lists)
+            else:
+                client_operation()
         x += 1
-    signal.alarm(0)
     app_mgr.close()
+
+
+#  pkt=Ether(dst="FF:FF:FF:FF:FF:FF")/IP(dst="192.168.2.255")/Padding("XXXXX")

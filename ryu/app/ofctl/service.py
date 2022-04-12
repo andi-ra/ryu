@@ -27,6 +27,7 @@ from ryu.controller.handler import set_ev_cls
 
 from . import event
 from . import exception
+from ...lib import hub
 
 
 class _SwitchInfo(object):
@@ -43,6 +44,10 @@ class OfctlService(app_manager.RyuApp):
         self.name = 'ofctl_service'
         self._switches = {}
         self._observing_events = {}
+
+    def close(self):
+        print("Exiting OFCTL service")
+        raise hub.TaskExit
 
     def _observe_msg(self, msg_cls):
         assert msg_cls is not None

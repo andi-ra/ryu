@@ -16,6 +16,15 @@
 
 import logging
 import os
+import subprocess
+
+from scapy.arch import get_if_addr
+from scapy.interfaces import get_if_list
+from scapy.layers.inet import UDP, IP
+from scapy.layers.l2 import Ether
+from scapy.packet import Raw
+from scapy.sendrecv import sendp
+
 from ryu.lib import ip
 
 
@@ -149,7 +158,25 @@ if HUB_TYPE == 'eventlet':
             else:
                 self.handle = handle
 
+        def _announce_clusterhead(self):
+            while True:
+                print("Announcing myself as clusterhead")
+                ip = get_if_addr("eth0")
+                for iface in [interface for interface in get_if_list()
+                              if "lo" not in interface
+                                 and "ovs" not in interface
+                                 and "br" not in interface]:
+                    try:
+                        sendp( Ether(dst="FF:FF:FF:FF:FF:FF") / IP(dst="192.168.0.255") /
+                            UDP(sport=62879, dport=6969) / (Raw(str(ip).encode())), iface=iface)
+                    except OSError:
+                        print("Bridge is down, turning it up...")
+                        out = subprocess.run("ifconfig br0 up", shell=True)
+                        print(out)
+                sleep(5)
+
         def serve_forever(self):
+            spawn(self._announce_clusterhead)
             while True:
                 sock, addr = self.server.accept()
                 spawn(self.handle, sock, addr)

@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iproute2 \
     procps \
     git \
+    iputils-ping  \
+    net-tools\
     lldpd \
  && rm -rf /var/lib/apt/lists/* \
  && curl -kL https://github.com/osrg/ryu/archive/master.tar.gz | tar -xvz \
