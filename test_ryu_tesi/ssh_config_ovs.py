@@ -1,15 +1,26 @@
 """Questo file lo uso per la configurazione senza controller dello switch"""
+import concurrent
 import ipaddress
 import json
+import random
 import re
+import select
+import shlex
+import subprocess
+import sys
+import threading
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+from time import sleep
 from typing import List
 
 import macaddress as macaddress
 from dataclasses import dataclass
 
 from paramiko.client import SSHClient, AutoAddPolicy
+from scapy.layers.inet import UDP
 from scapy.layers.l2 import arping, ARP
+from scapy.sendrecv import AsyncSniffer
 
 
 class RouteDict:
@@ -70,8 +81,6 @@ list_of_commands = [
 list_of_switches = []
 list_of_datapaths = []
 
-
-
 lista_oppie_origine_destinazione = [
     coppia_origine_destinazione(
         origine=iface(ip_addr=ipaddress.ip_address("192.168.1.2"),
@@ -93,6 +102,7 @@ def execute_command(cmd: str, client_param) -> str:
     client = client_param
     stdin, stdout, stderr = client.exec_command(cmd)
     response = ""
+    sleep(0.1)
     if stdout.channel.recv_exit_status() == 0:
         response += str(f'STDOUT: {stdout.read().decode("utf8")}')
     else:
@@ -108,14 +118,14 @@ def get_config_switch(ip_addr: ipaddress.IPv4Address) -> switch:
     client.load_host_keys("/home/gns3/.ssh/known_hosts")
     client.set_missing_host_key_policy(AutoAddPolicy())
     client.connect(str(ip_addr), username="root")
-    result_string = execute_command("ovs-vsctl get-controller br0")
+    result_string = execute_command("ovs-vsctl get-controller br0", client)
     try:
         ctrl_addr = ipaddress.ip_address((result_string.strip("STDOUT: tcp:")).split(":")[0])
     except ValueError:
         print(RuntimeWarning("Non connected to controller..."))
         ctrl_addr = ipaddress.ip_address("0.0.0.0")
     list_of_ports = []
-    result_string = execute_command('ovs-ofctl -O OpenFlow13 dump-ports-desc br0')
+    result_string = execute_command('ovs-ofctl -O OpenFlow13 dump-ports-desc br0', client)
     chunks = result_string.split("\n")
     for row in chunks:
         if ": addr:" in row:
@@ -134,38 +144,44 @@ def get_config_switch(ip_addr: ipaddress.IPv4Address) -> switch:
     return datapath_switch
 
 
-def set_flow_rule(ip_addr: ipaddress.IPv4Address, source, destination, output_iface: str):
-    client.connect(str(ip_addr), username="root")
+# def set_flow_rule(ip_addr: ipaddress.IPv4Address, source, destination, output_iface: str):
+#     client.connect(str(ip_addr), username="root")
+#
+#     output_port = [port.port_number
+#                    for port in list_of_switches[datapath].switch_ports if port.port_name == output_iface]
+#     cmd_string = f"ovs-ofctl -O OpenFlow13add-flow br0 dl_src={source}," \
+#                  f"dl_dst={destination},actions=output:{str(output_port).strip('[]')}"
+#     result_string = execute_command(cmd_string)
+#     print(cmd_string)
+#     client.close()
 
-    output_port = [port.port_number
-                   for port in list_of_switches[datapath].switch_ports if port.port_name == output_iface]
-    cmd_string = f"ovs-ofctl -O OpenFlow13add-flow br0 dl_src={source}," \
-                 f"dl_dst={destination},actions=output:{str(output_port).strip('[]')}"
-    result_string = execute_command(cmd_string)
-    print(cmd_string)
-    client.close()
+def start_simulation(list_of_args):
+    ip_addr = list_of_args[0]
+    mode = list_of_args[1]
+    print(f"Starting simulation for {ip_addr} in mode: {mode}")
+    cmd = shlex.split(
+        f'nohup sshpass -p "root" ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@{ip_addr} ": ; python3 /root/ryu/app_final.py {mode}"')
+    output = subprocess.Popen(cmd)
+    output.wait(160)
 
 
 def reset_to_intial_config(ip_addr: ipaddress.IPv4Address):
     client = SSHClient()
-    # client.load_host_keys("/home/gns3/.ssh/known_hosts")
+    client.load_host_keys("/home/gns3/.ssh/known_hosts")
     client.load_system_host_keys()
-    # client.set_missing_host_key_policy(AutoAddPolicy())
+    client.set_missing_host_key_policy(AutoAddPolicy())
     client.connect(str(ip_addr), username="root")
     print(f"\tResetting {str(ip_addr)}")
     result_string = execute_command("ovs-ofctl -O OpenFlow13 del-flows br0", client)
-    print(result_string)
     result_string = execute_command("ovs-vsctl emer-reset", client)
-    print(result_string)
     result_string = execute_command("ovs-vsctl --if-exists del-port  br0 eth0", client)
-    print(result_string)
+    result_string = execute_command("ifconfig br0 up", client)
     result_string = execute_command("ovs-vsctl set bridge br0 protocols=OpenFlow13", client)
-    print(result_string)
-    # result_string = execute_command("ovs-vsctl set-controller br0 tcp:192.168.0.9:6653")
     result_string = execute_command('ovs-vsctl set Bridge br0 stp_enable=true', client)
-    print(result_string)
-    # result_string = execute_command('ovs-vsctl set Bridge br0 stp_enable=false')
-    # result_string = execute_command('ovs-vsctl del-controller bridge')
+    result_string = execute_command('ovs-vsctl list-ports br0 ', client)
+    for i in range(1, 16):
+        result_string = execute_command(f"ovs-vsctl add-port  br0 eth{i}", client)
+        print(result_string)
     client.close()
     del client
 
@@ -229,18 +245,40 @@ def reset_to_intial_config(ip_addr: ipaddress.IPv4Address):
 
 
 if __name__ == '__main__':
+    # print("Starting from GNS3 ubuntu machine")
+    # cmd = shlex.split("bash /tmp/pycharm_project_764/test_ryu_tesi/configure.sh ")
+    # output = subprocess.Popen(cmd)
+    # output.wait(360)
+    t = AsyncSniffer(filter="udp", lfilter=lambda x: x[UDP].dport == 6969, timeout=6, count=1, iface="ens1")
+    t.start()
 
     result = arping("192.168.0.0/24")
     for item in result[0]:
         print(f"\tConfiguring {item[0][0][ARP].pdst}")
         list_of_switches.append(switch(item[0][0][ARP].pdst))
-    print("Resetting to intial settings")
-    for datapath in list_of_switches:
-        reset_to_intial_config(datapath.address)
-    print("Creating list of datapaths")
-    for datapath in list_of_switches:
-        dp = get_config_switch(datapath.address)
-        print(f"switch: {datapath} is \n{dp}")
-        list_of_datapaths.append(dp)
+    t.join()
+    # print("Resetting to initial settings")
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+    #     future = {executor.submit(reset_to_intial_config, datapath.address): datapath for datapath in list_of_switches}
+    #     for fut in concurrent.futures.as_completed(future):
+    #         result = future[fut]
+    #         print(result)
+
+    # print("Creating list of datapaths")
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+    #     future = {executor.submit(get_config_switch, datapath.address): datapath for datapath in list_of_switches}
+    #     for fut in concurrent.futures.as_completed(future):
+    #         dp = future[fut]
+    #         list_of_datapaths.append(dp)
+    #         print(f"switch is \n{dp}")
+    #
+    # print("Starting with simulations")
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+    #     ctrl_datapath = random.choice(list_of_datapaths)
+    #     list_of_datapaths.remove(ctrl_datapath)
+    #     future = {executor.submit(start_simulation, [datapath.address, "client"]): datapath for datapath in
+    #               list_of_switches}
+    #     start_simulation([ctrl_datapath.address, "ctrl"])
+
 
     print("Closing connection and cleaning up...")

@@ -1,3 +1,4 @@
+
 import ipaddress
 import re
 import signal
@@ -103,3 +104,5 @@ if __name__ == '__main__':
 
 
 #  pkt=Ether(dst="FF:FF:FF:FF:FF:FF")/IP(dst="192.168.2.255")/Padding("XXXXX")
+
+# nohup & sshpass -p 'root' ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@192.168.0.120 ": ; python3 /root/ryu/app_final.py ctrl"
