@@ -1,26 +1,99 @@
 """Questo file lo uso per la configurazione senza controller dello switch"""
-import concurrent
+# REST API for switch configuration
+#
+# get all the switches
+# GET /v1.0/topology/switches
+#
+# get the switch
+# GET /v1.0/topology/switches/<dpid>
+#
+# get all the links
+# GET /v1.0/topology/hosts
+#
+# get the links of a switch
+# GET /v1.0/topology/links/<dpid>
+#
+# get all the hosts
+# GET /v1.0/topology/hosts
+#
+# get the hosts of a switch
+# GET /v1.0/topology/hosts/<dpid>
+#
+# where
+# <dpid>: datapath id in 16 hex
+import copy
 import ipaddress
 import json
-import random
 import re
-import select
 import shlex
 import subprocess
-import sys
-import threading
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
+from random import randint
 from time import sleep
 from typing import List
 
 import macaddress as macaddress
+import matplotlib.pyplot as plt
+import networkx as nx
+import requests
 from dataclasses import dataclass
-
 from paramiko.client import SSHClient, AutoAddPolicy
 from scapy.layers.inet import UDP
 from scapy.layers.l2 import arping, ARP
 from scapy.sendrecv import AsyncSniffer
+
+from ryu.ofproto.ofproto_v1_3_parser import OFPPort
+from ryu.topology.switches import Link, Port
+
+
+class LinkNet(Link):
+
+    def __init__(self, src, dst):
+        super(LinkNet, self).__init__(src=src, dst=dst)
+        self.link_data = {"loss_rate": "0", "delay": "0", "jitter": "0"}
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__,
+                          sort_keys=True, indent=4)
+
+    def __hash__(self):
+        return hash(self.src) ^ hash(self.dst)
+
+    def __eq__(self, other):
+        return (hash(self.dst) == hash(other.src)) and (hash(other.dst) == hash(self.src))
+
+
+class API_Port(Port):
+    def __init__(self, elem):
+        port = OFPPort(
+            port_no=elem["port_no"],
+            hw_addr=elem["hw_addr"],
+            name=elem['name'],
+            config=None,
+            state=None,
+            curr=None,
+            advertised=None,
+            supported=None,
+            peer=None,
+            curr_speed=None,
+            max_speed=None)
+        super(API_Port, self).__init__(dpid=elem['dpid'], ofpport=port, ofproto="1.3")
+
+    def __str__(self):
+        return f'Port<dpid={self.dpid}, port_no={self.port_no}, hw_addr:{self.hw_addr}>'
+
+    def __hash__(self):
+        return hash(self.dpid) ^ hash(self.port_no) ^ hash(self.hw_addr)
+
+    def __eq__(self, other):
+        return self.__hash__() == hash(other)
+
+
+def NetworkToJson(linkset: LinkNet) -> str:
+    json_string = ","
+    json_string = json_string.join([link.toJSON() for link in list(linkset)])
+    json_string = "[" + json_string + "]"
+    return json_string
 
 
 class RouteDict:
@@ -245,11 +318,7 @@ def reset_to_intial_config(ip_addr: ipaddress.IPv4Address):
 
 
 if __name__ == '__main__':
-    # print("Starting from GNS3 ubuntu machine")
-    # cmd = shlex.split("bash /tmp/pycharm_project_764/test_ryu_tesi/configure.sh ")
-    # output = subprocess.Popen(cmd)
-    # output.wait(360)
-    t = AsyncSniffer(filter="udp", lfilter=lambda x: x[UDP].dport == 6969, timeout=6, count=1, iface="ens1")
+    t = AsyncSniffer(filter="udp", lfilter=lambda x: x[UDP].dport == 6969, timeout=6, count=1, iface="ens4")
     t.start()
 
     result = arping("192.168.0.0/24")
@@ -257,28 +326,58 @@ if __name__ == '__main__':
         print(f"\tConfiguring {item[0][0][ARP].pdst}")
         list_of_switches.append(switch(item[0][0][ARP].pdst))
     t.join()
-    # print("Resetting to initial settings")
-    # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #     future = {executor.submit(reset_to_intial_config, datapath.address): datapath for datapath in list_of_switches}
-    #     for fut in concurrent.futures.as_completed(future):
-    #         result = future[fut]
-    #         print(result)
+    results = t.results
+    print(results)
+    try:
+        ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', str(bytes(results[0].payload)))
+    except IndexError:
+        print("No packet received...")
+    try:
+        address = ipaddress.IPv4Address(str(ip[0]))
+    except ipaddress.AddressValueError:
+        address = ipaddress.IPv4Address('192.168.0.' + str(ip[0]).split(".")[3])
+    print(address)
+    response = requests.get(f"http://{address}:8080/v1.0/topology/switches")
+    switches = json.loads(response.text)
+    for dpid in switches:
+        dpid.update({"ofctl_dpid": int(dpid['dpid'].lstrip("0000"), base=16)})
 
-    # print("Creating list of datapaths")
-    # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #     future = {executor.submit(get_config_switch, datapath.address): datapath for datapath in list_of_switches}
-    #     for fut in concurrent.futures.as_completed(future):
-    #         dp = future[fut]
-    #         list_of_datapaths.append(dp)
-    #         print(f"switch is \n{dp}")
-    #
-    # print("Starting with simulations")
-    # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #     ctrl_datapath = random.choice(list_of_datapaths)
-    #     list_of_datapaths.remove(ctrl_datapath)
-    #     future = {executor.submit(start_simulation, [datapath.address, "client"]): datapath for datapath in
-    #               list_of_switches}
-    #     start_simulation([ctrl_datapath.address, "ctrl"])
-
-
-    print("Closing connection and cleaning up...")
+    r = requests.get(f"http://{address}:8080/v1.0/topology/links")
+    # print(r.text)
+    links = []
+    for elem in r.json():
+        links.append(LinkNet(src=API_Port(elem["src"]), dst=API_Port(elem["dst"])))
+    unique_dpids = {link.src.dpid for link in links}
+    G = nx.Graph()
+    for node in unique_dpids:
+        G.add_node(node)
+    # links = set(links)
+    links_dictionary = json.loads(NetworkToJson(links))
+    for link in links_dictionary:
+        G.add_edge(link["src"]["dpid"], link["dst"]["dpid"])
+    r = requests.get(f"http://{address}:8080/v1.0/topology/hosts")
+    for port in r.json():
+        if "192.168.1.2" in port['ipv4']:
+            src_host = port
+            G.add_edge(
+                src_host["ipv4"][0],  # Attenzione i miei hosts hanno un solo ip per interfaccia!
+                src_host["port"]["dpid"],
+                delay="0",
+                jitter="0",
+                loss_rate=int("0")
+            )
+        elif "192.168.1.3" in port['ipv4']:
+            dst_host = port
+            G.add_edge(
+                dst_host["ipv4"][0],
+                dst_host["port"]["dpid"],
+                delay="0",  # Questi li ho messi semplicemente per uniformare i vari link
+                jitter="0",
+                loss_rate=int("0")
+            )
+        else:
+            continue
+    pos = nx.circular_layout(G)
+    nx.draw(G, with_labels=True)
+    plt.show()
+    plt.close()

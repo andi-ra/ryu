@@ -48,6 +48,8 @@ def long_running_function(app_manager, app_list):
 
 
 def clusterhead_operation(app_mgr, app_lists):
+    out = subprocess.run(f"ovs-vsctl set Bridge br0 stp_enable=false", shell=True)
+    print(out)
     try:
         long_running_function(app_mgr, app_lists)
     except hub.TaskExit:
@@ -75,6 +77,8 @@ def client_operation():
         address = ipaddress.IPv4Address('192.168.0.'+str(ip[0]).split(".")[3])
     out = subprocess.run(f"ovs-vsctl set-controller br0 tcp:{str(address)}:6653", shell=True)
     print(out)
+    out = subprocess.run(f"ovs-vsctl set Bridge br0 stp_enable=true", shell=True)
+    print(out)
     time.sleep(5)
 
 
@@ -83,7 +87,7 @@ if __name__ == '__main__':
     log.init_log()
     app_lists = ['ryu.clusterhead.rest_clusterhead',
                  'ryu.app.ofctl.service',
-                 'ryu.app.shortest_path',
+                 'ryu.app.simple_switch_13',
                  'ryu.controller.ofp_handler',
                  'ryu.app.ofctl_rest',]
     app_mgr = app_manager.AppManager.get_instance()
